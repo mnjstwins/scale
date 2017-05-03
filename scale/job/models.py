@@ -12,6 +12,7 @@ from django.conf import settings
 from django.db import models, transaction
 from django.db.models import Q
 from django.utils import timezone
+from simple_history.models import HistoricalRecords
 
 import job.execution.container as job_exe_container
 import util.parse
@@ -2321,6 +2322,10 @@ class JobType(models.Model):
     :type paused: :class:`django.db.models.DateTimeField`
     :keyword last_modified: When the job type was last modified
     :type last_modified: :class:`django.db.models.DateTimeField`
+    :keyword changed_by: User the recipe type was modified by
+    :type changed_by: :class:`django.auth.models.User`
+    :keyword history: Full change history for model
+    :type history: :class:`simple_history.models.HistoricalRecords`
     """
 
     BASE_FIELDS = ('id', 'name', 'version', 'title', 'description', 'category', 'author_name', 'author_url',
@@ -2370,6 +2375,8 @@ class JobType(models.Model):
     archived = models.DateTimeField(blank=True, null=True)
     paused = models.DateTimeField(blank=True, null=True)
     last_modified = models.DateTimeField(auto_now=True)
+    changed_by = models.ForeignKey('auth.User', null=True)
+    history = HistoricalRecords(table_name='job_type_history')
 
     objects = JobTypeManager()
 
@@ -2406,11 +2413,29 @@ class JobType(models.Model):
         """
         return self.name, self.version
 
+    @property
+    def _history_user(self):
+        """Returns the user who changed a given job type instance
+        
+        :returns: The user responsible for last change
+        :rtype: :class:`django.auth.models.User`
+        """
+        return self.changed_by
+
+    @_history_user.setter
+    def _history_user(self, value):
+        """Updates the user who changed a given job type instance
+        
+        :param value: The user responsible for last change
+        :type value: :class:`django.auth.models.User`
+        """
+        self.changed_by = value
+
     class Meta(object):
         """meta information for the db"""
         db_table = 'job_type'
         unique_together = ('name', 'version')
-
+        
 
 class JobTypeRevisionManager(models.Manager):
     """Provides additional methods for handling job type revisions

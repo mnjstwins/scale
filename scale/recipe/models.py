@@ -6,6 +6,7 @@ import copy
 import django.utils.timezone as timezone
 import django.contrib.postgres.fields
 from django.db import models, transaction
+from simple_history.models import HistoricalRecords
 
 from job.models import Job, JobType
 from recipe.configuration.data.recipe_data import RecipeData
@@ -908,6 +909,10 @@ class RecipeType(models.Model):
     :type archived: :class:`django.db.models.DateTimeField`
     :keyword last_modified: When the recipe type was last modified
     :type last_modified: :class:`django.db.models.DateTimeField`
+    :keyword changed_by: User the recipe type was modified by
+    :type changed_by: :class:`django.auth.models.User`
+    :keyword history: Full change history for model
+    :type history: :class:`simple_history.models.HistoricalRecords`
     """
 
     name = models.CharField(db_index=True, max_length=50)
@@ -923,6 +928,8 @@ class RecipeType(models.Model):
     created = models.DateTimeField(auto_now_add=True)
     archived = models.DateTimeField(blank=True, null=True)
     last_modified = models.DateTimeField(auto_now=True)
+    changed_by = models.ForeignKey('auth.User', null=True)
+    history = HistoricalRecords(table_name='recipe_type_history')
 
     objects = RecipeTypeManager()
 
@@ -934,6 +941,24 @@ class RecipeType(models.Model):
         """
 
         return RecipeDefinition(self.definition)
+        
+    @property
+    def _history_user(self):
+        """Returns the user who changed a given job type instance
+        
+        :returns: The user responsible for last change
+        :rtype: :class:`django.auth.models.User`
+        """
+        return self.changed_by
+
+    @_history_user.setter
+    def _history_user(self, value):
+        """Updates the user who changed a given job type instance
+        
+        :param value: The user responsible for last change
+        :type value: :class:`django.auth.models.User`
+        """
+        self.changed_by = value
 
     class Meta(object):
         """meta information for the db"""
